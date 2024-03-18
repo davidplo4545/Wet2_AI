@@ -70,22 +70,30 @@ class AgentGreedyImproved(AgentGreedy):
 
 import time
 
-class AgentMinimax(Agent):
+# AgentAlphaBeta
+
+class AgentAlphaBeta(Agent):
+    def __init__(self):
+        self.ended = False
     # TODO: section b : 1
+
     def run_step(self, env: WarehouseEnv, agent_id, time_limit):
-        start = time.time()
-        best_move = None
+        start_time = time.monotonic()
+        self.ended = False
+        finish_time = start_time + time_limit - 0.1
+
+        best_move = env.get_legal_operators(agent_id)[0]
         curr_depth = 1
         while True:
-            try:
-                if 0.3 * time_limit >= time.time() - start:
-                    _, curr_move = self.minmax(env, agent_id, curr_depth, agent_id)
-                    best_move = curr_move
-                    curr_depth += 1
-                else:
-                    raise TimeoutError()
-            except:
+            if time.monotonic() > finish_time:
                 return best_move
+            _, curr_move = self.alpha_beta(env, agent_id, curr_depth, agent_id, finish_time, float("-inf"), float("inf"))
+            if not self.ended and curr_move != None:
+                best_move = curr_move
+            else:
+                break
+            curr_depth += 1
+        return best_move
 
     def succ(self, state, turn):
         children = []
@@ -95,35 +103,112 @@ class AgentMinimax(Agent):
             child.apply_operator(turn, op)
         return children
 
-    def minmax(self, state, agent_id, depth, turn):
-        if depth == 0:
-            return state.get_robot(agent_id).credit, None
+    def alpha_beta(self, state, agent_id, depth, turn, finish_time, alpha, beta):
+        if time.monotonic() > finish_time:
+            self.ended = True
+            return 0, None
+        if depth == 0 or state.done():
+            return smart_heuristic(state, agent_id), None
+        children = self.succ(state, turn)
+        if turn == agent_id:
+            cur_max = float("-inf")
+            best_action = None
+            for c, operator in children:
+                v, _ = self.alpha_beta(c, agent_id, depth - 1, (turn+1)%2, finish_time, alpha, beta)
+                if time.monotonic() > finish_time:
+                    self.ended = True
+                    return 0, None
+                if cur_max < v:
+                    best_action = operator
+                    cur_max = v
+                # alpha-beta
+                alpha = max(cur_max, alpha)
+                if cur_max >= beta:
+                    return float("inf"), best_action
+            return cur_max, best_action
+        else:
+            cur_min = float("inf")
+            best_action = None
+            for c, operator in children:
+                v, _ = self.alpha_beta(c, agent_id, depth - 1, (turn+1)%2, finish_time, alpha, beta)
+                if time.monotonic() > finish_time:
+                    self.ended = True
+                    return 0, None
+                if v < cur_min:
+                    best_action = operator
+                    cur_min = v
+                # alpha-beta
+                beta = min(cur_min, beta)
+                if cur_min <= alpha:
+                    return float("-inf"), best_action
+            return cur_min, best_action
+
+class AgentMinimax(Agent):
+    # TODO: section c : 1
+    def __init__(self):
+        self.ended = False
+    def run_step(self, env: WarehouseEnv, agent_id, time_limit):
+        start_time = time.monotonic()
+        self.ended = False
+        finish_time = start_time + time_limit - 0.1
+
+        best_move = env.get_legal_operators(agent_id)[0]
+        curr_depth = 1
+        while True:
+            if time.monotonic() > finish_time:
+                return best_move
+            _, curr_move = self.minmax(env, agent_id, curr_depth, agent_id, finish_time)
+            if not self.ended and curr_move != None:
+                best_move = curr_move
+            else:
+                break
+            curr_depth += 1
+        return best_move
+
+    def succ(self, state, turn):
+        children = []
+        operators = state.get_legal_operators(turn)
+        children = [(state.clone(), op) for op in operators]
+        for child, op in children:
+            child.apply_operator(turn, op)
+        return children
+
+    def minmax(self, state, agent_id, depth, turn, finish_time):
+        if time.monotonic() > finish_time:
+            self.ended = True
+            return 0, None
+        if depth == 0 or state.done():
+            return smart_heuristic(state, agent_id), None
         children = self.succ(state, turn)
         if turn == agent_id:
             cur_max = float("-inf")
             best_action = None
 
             for c, operator in children:
-                v, _ = self.minmax(c, agent_id, depth - 1, (turn+1)%2)
+                v, _ = self.minmax(c, agent_id, depth - 1, (turn+1)%2, finish_time)
+                if time.monotonic() > finish_time:
+                    self.ended = True
+                    return 0, None
+
                 if cur_max < v:
                     best_action = operator
                     cur_max = v
+
             return cur_max, best_action
         else:
             cur_min = float("inf")
             best_action = None
 
             for c, operator in children:
-                v, _ = self.minmax(c, agent_id, depth - 1, (turn+1)%2)
+                v, _ = self.minmax(c, agent_id, depth - 1, (turn+1)%2, finish_time)
+                if time.monotonic() > finish_time:
+                    self.ended = True
+                    return 0, None
                 if v < cur_min:
                     best_action = operator
                     cur_min = v
             return cur_min, best_action
 
-class AgentAlphaBeta(Agent):
-    # TODO: section c : 1
-    def run_step(self, env: WarehouseEnv, agent_id, time_limit):
-        raise NotImplementedError()
 
 
 class AgentExpectimax(Agent):

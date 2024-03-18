@@ -133,6 +133,8 @@ class WarehouseEnv(object):
     def apply_operator(self, robot_index: int, operator: str):
         self.num_steps -= 1
         robot = self.robots[robot_index]
+        if operator not in self.get_legal_operators(robot_index):
+            print(f"Problem for robot:{robot_index} with action {operator}")
         assert operator in self.get_legal_operators(robot_index)
         assert not self.num_steps < 0
         if operator == 'park':
