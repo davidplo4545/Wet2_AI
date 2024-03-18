@@ -68,45 +68,57 @@ class AgentGreedyImproved(AgentGreedy):
     def heuristic(self, env: WarehouseEnv, robot_id: int):
         return smart_heuristic(env, robot_id)
 
+import time
 
 class AgentMinimax(Agent):
     # TODO: section b : 1
     def run_step(self, env: WarehouseEnv, agent_id, time_limit):
-        import time
-        robot = env.get_robot(agent_id)
-        curr_depth = 1
         start = time.time()
-
-        while 0.9 * time_limit > time.time - start:
-            curr_depth +=1
-        return 0
-        raise NotImplementedError()
+        best_move = None
+        curr_depth = 1
+        while True:
+            try:
+                if 0.3 * time_limit >= time.time() - start:
+                    _, curr_move = self.minmax(env, agent_id, curr_depth, agent_id)
+                    best_move = curr_move
+                    curr_depth += 1
+                else:
+                    raise TimeoutError()
+            except:
+                return best_move
 
     def succ(self, state, turn):
         children = []
         operators = state.get_legal_operators(turn)
-        for operator in operators:
-            state_copy = state.clone()
-            state_copy.apply_operator(turn, operator)
-            children.append(state_copy)
+        children = [(state.clone(), op) for op in operators]
+        for child, op in children:
+            child.apply_operator(turn, op)
         return children
 
     def minmax(self, state, agent_id, depth, turn):
         if depth == 0:
-            return state.get_robot(agent_id).credit
+            return state.get_robot(agent_id).credit, None
         children = self.succ(state, turn)
         if turn == agent_id:
-            cur_max = float("inf")
-            for c in children:
-                v = self.minmax(c, agent_id, depth - 1, (turn+1)%2)
-                cur_max = max(v, cur_max)
-            return cur_max
+            cur_max = float("-inf")
+            best_action = None
+
+            for c, operator in children:
+                v, _ = self.minmax(c, agent_id, depth - 1, (turn+1)%2)
+                if cur_max < v:
+                    best_action = operator
+                    cur_max = v
+            return cur_max, best_action
         else:
-            cur_min = float("-inf")
-            for c in children:
-                v = self.minmax(c, agent_id, depth - 1, (turn+1)%2)
-                cur_min = min(v, cur_min)
-            return cur_min
+            cur_min = float("inf")
+            best_action = None
+
+            for c, operator in children:
+                v, _ = self.minmax(c, agent_id, depth - 1, (turn+1)%2)
+                if v < cur_min:
+                    best_action = operator
+                    cur_min = v
+            return cur_min, best_action
 
 class AgentAlphaBeta(Agent):
     # TODO: section c : 1
